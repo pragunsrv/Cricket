@@ -18,6 +18,7 @@ class Player:
         self.form = 100
         self.fatigue = 0
         self.injury_status = False
+        self.injury_history = []
 
     def bat(self):
         if not self.is_out and not self.injury_status:
@@ -40,6 +41,7 @@ class Player:
                 self.form += runs * 0.2
             if random.random() < 0.05:
                 self.injury_status = True
+                self.injury_history.append("Injury")
             return runs, shot_type
         return 0, "N/A"
 
@@ -58,6 +60,8 @@ class Player:
 
     def display_statistics(self):
         print(f"{self.name}: Matches: {self.matches_played}, Total Runs: {self.total_runs}, Total Balls Faced: {self.total_balls_faced}, High Score: {self.high_score}, Matches Won: {self.matches_won}, Form: {self.form:.2f}, Fatigue: {self.fatigue:.2f}, Injury Status: {'Injured' if self.injury_status else 'Healthy'}")
+        if self.injury_history:
+            print(f"Injury History: {', '.join(self.injury_history)}")
 
 class Team:
     def __init__(self, name, players):
@@ -68,8 +72,9 @@ class Team:
         self.wickets = 0
         self.balls_faced = 0
         self.runs_per_ball = []
-        self.matches_won = 0
         self.shot_types = []
+        self.matches_won = 0
+        self.shot_counts = {"Defensive": 0, "Aggressive": 0, "Neutral": 0}
 
     def get_current_batsman(self):
         return self.players[self.current_batsman_index]
@@ -82,6 +87,7 @@ class Team:
             self.balls_faced += 1
             self.runs_per_ball.append(runs)
             self.shot_types.append(shot_type)
+            self.shot_counts[shot_type] += 1
             if current_batsman.is_out:
                 current_batsman.update_statistics()
                 self.wickets += 1
@@ -102,6 +108,7 @@ class Team:
         print(f"Score: {self.score}/{self.wickets} in {self.balls_faced} balls")
         print(f"Runs per ball: {self.runs_per_ball}")
         print(f"Shot types: {self.shot_types}")
+        print(f"Shot counts: {self.shot_counts}")
         for player in self.players:
             status = "Out" if player.is_out else "Not Out"
             print(f"{player.name}: {player.runs} runs off {player.balls_faced} balls ({status})")
@@ -118,6 +125,13 @@ class Tournament:
         self.format_type = format_type
         self.group_stage_results = []
         self.knockout_stage_results = []
+        self.tournament_phase = 1
+        self.phases = {
+            1: "Group Stage",
+            2: "Quarter Finals",
+            3: "Semi Finals",
+            4: "Finals"
+        }
 
     def simulate_group_stage(self):
         print("Simulating Group Stage...")
@@ -130,13 +144,16 @@ class Tournament:
             print(f"{team}: {points} points")
 
     def simulate_knockout_stage(self):
-        print("Simulating Knockout Stage...")
+        print(f"Simulating Knockout Stage - Phase {self.tournament_phase}: {self.phases[self.tournament_phase]}")
         if self.format_type == "Single-Elimination":
             self.simulate_single_elimination()
         elif self.format_type == "Double-Elimination":
             self.simulate_double_elimination()
+        self.tournament_phase += 1
 
     def simulate_single_elimination(self):
+        if self.tournament_phase == 1:
+            self.simulate_group_stage()
         print("Single Elimination Tournament")
         while len(self.teams) > 1:
             match_results = []
@@ -149,6 +166,8 @@ class Tournament:
         print(f"Tournament Winner: {self.teams[0].name}")
 
     def simulate_double_elimination(self):
+        if self.tournament_phase == 1:
+            self.simulate_group_stage()
         print("Double Elimination Tournament")
         eliminated = set()
         while len(self.teams) > 1:
@@ -166,6 +185,7 @@ class Tournament:
 
     def display_tournament_summary(self):
         print(f"Tournament Format: {self.format_type}")
+        print(f"Phase: {self.phases[self.tournament_phase - 1]}")
         print("Group Stage Results:")
         for team, points in self.group_stage_results:
             print(f"{team}: {points} points")
@@ -183,25 +203,28 @@ class CricketGame:
         self.weather_conditions = weather_conditions
         self.stadium = stadium
         self.match_history = []
+        self.weather_effects = {
+            "Clear": 1.0,
+            "Rainy": 0.7,
+            "Windy": 0.8
+        }
 
     def apply_weather_conditions(self, team):
-        if self.weather_conditions == "Rainy":
-            team.balls_faced = max(0, team.balls_faced - random.randint(1, 3))
-        elif self.weather_conditions == "Windy":
-            team.balls_faced = max(0, team.balls_faced - random.randint(1, 2))
+        effect = self.weather_effects.get(self.weather_conditions, 1.0)
+        for player in team.players:
+            if not player.injury_status:
+                player.form *= effect
+                player.fatigue *= effect
 
-    def play_innings(self, batting_team):
-        self.apply_weather_conditions(batting_team)
+    def play_innings(self, team):
+        self.apply_weather_conditions(team)
         for _ in range(self.total_balls):
-            if batting_team.wickets == 10:
+            runs, shot_type = team.bat()
+            if team.get_current_batsman().is_out:
                 break
-            run, shot_type = batting_team.bat()
-            print(f"Ball {_ + 1}: {run} run(s), Shot: {shot_type}")
-            time.sleep(0.1)
 
     def display_match_summary(self):
-        self.team1.display_scorecard()
-        self.team2.display_scorecard()
+        print(f"Match Summary at {self.stadium}:")
         if self.team1.score > self.team2.score:
             print(f"{self.team1.name} wins by {self.team1.score - self.team2.score} runs")
             self.team1.update_team_statistics(True)
@@ -252,6 +275,9 @@ def select_team(team_name):
         players.append(player_name)
     return players
 
+def create_tournament(teams, format_type):
+    return Tournament(teams, format_type)
+
 def main():
     print("Welcome to the Cricket Game!")
     team1_name = input("Enter name for Team 1: ")
@@ -279,6 +305,19 @@ def main():
             game.start_game()
         else:
             break
+
+    tournament_choice = input("Do you want to create a tournament? (yes/no): ").lower()
+    if tournament_choice == "yes":
+        teams = []
+        num_teams = int(input("Enter number of teams: "))
+        for _ in range(num_teams):
+            team_name = input("Enter team name: ")
+            players = select_team(team_name)
+            teams.append(Team(team_name, players))
+        format_type = input("Enter tournament format (Single-Elimination/Double-Elimination): ")
+        tournament = create_tournament(teams, format_type)
+        tournament.simulate_knockout_stage()
+        tournament.display_tournament_summary()
 
 if __name__ == "__main__":
     main()
