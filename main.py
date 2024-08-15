@@ -1,6 +1,8 @@
 import random
 import sys
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 
 class Player:
     def __init__(self, name):
@@ -18,7 +20,13 @@ class Player:
 
     def bat(self):
         if not self.is_out:
-            runs = random.randint(0, 6)
+            shot_type = random.choices(["Defensive", "Aggressive", "Neutral"], [0.3, 0.5, 0.2])[0]
+            if shot_type == "Defensive":
+                runs = random.randint(0, 2)
+            elif shot_type == "Aggressive":
+                runs = random.randint(0, 6)
+            else:
+                runs = random.randint(0, 4)
             self.runs += runs
             self.balls_faced += 1
             if runs == 0 and random.choice([True, False]):
@@ -29,8 +37,8 @@ class Player:
                 self.is_out = True
             if runs > 0:
                 self.form += runs * 0.2
-            return runs
-        return 0
+            return runs, shot_type
+        return 0, "N/A"
 
     def update_statistics(self):
         self.matches_played += 1
@@ -57,6 +65,7 @@ class Team:
         self.balls_faced = 0
         self.runs_per_ball = []
         self.matches_won = 0
+        self.shot_types = []
 
     def get_current_batsman(self):
         return self.players[self.current_batsman_index]
@@ -64,16 +73,17 @@ class Team:
     def bat(self):
         if self.wickets < 10:
             current_batsman = self.get_current_batsman()
-            runs = current_batsman.bat()
+            runs, shot_type = current_batsman.bat()
             self.score += runs
             self.balls_faced += 1
             self.runs_per_ball.append(runs)
+            self.shot_types.append(shot_type)
             if current_batsman.is_out:
                 current_batsman.update_statistics()
                 self.wickets += 1
                 self.current_batsman_index += 1
-            return runs
-        return 0
+            return runs, shot_type
+        return 0, "N/A"
 
     def update_team_statistics(self, won):
         if won:
@@ -87,6 +97,7 @@ class Team:
         print(f"Team: {self.name}")
         print(f"Score: {self.score}/{self.wickets} in {self.balls_faced} balls")
         print(f"Runs per ball: {self.runs_per_ball}")
+        print(f"Shot types: {self.shot_types}")
         for player in self.players:
             status = "Out" if player.is_out else "Not Out"
             print(f"{player.name}: {player.runs} runs off {player.balls_faced} balls ({status})")
@@ -98,22 +109,30 @@ class Team:
             player.display_statistics()
 
 class CricketGame:
-    def __init__(self, team1_name, team2_name, overs, players_per_team, match_format):
+    def __init__(self, team1_name, team2_name, overs, players_per_team, match_format, weather_conditions):
         self.team1 = Team(team1_name, players_per_team)
         self.team2 = Team(team2_name, players_per_team)
         self.overs = overs
         self.total_balls = self.overs * 6
         self.match_format = match_format
+        self.weather_conditions = weather_conditions
         self.match_history = []
 
+    def apply_weather_conditions(self, team):
+        if self.weather_conditions == "Rainy":
+            team.balls_faced = max(0, team.balls_faced - random.randint(1, 3))
+        elif self.weather_conditions == "Windy":
+            team.balls_faced = max(0, team.balls_faced - random.randint(1, 2))
+
     def play_innings(self, batting_team):
+        self.apply_weather_conditions(batting_team)
         for _ in range(self.total_balls):
             if batting_team.wickets == 10:
                 break
-            run = batting_team.bat()
-            print(f"Ball {_ + 1}: {run} run(s)")
+            run, shot_type = batting_team.bat()
+            print(f"Ball {_ + 1}: {run} run(s), Shot: {shot_type}")
             time.sleep(0.1)
-    
+
     def display_match_summary(self):
         self.team1.display_scorecard()
         self.team2.display_scorecard()
@@ -139,6 +158,18 @@ class CricketGame:
         print("Match History:")
         for i, match in enumerate(self.match_history, 1):
             print(f"Match {i}: {match}")
+
+    def plot_scorecard(self):
+        balls = np.arange(1, len(self.team1.runs_per_ball) + 1)
+        plt.figure(figsize=(10, 6))
+        plt.plot(balls, self.team1.runs_per_ball, label=self.team1.name, marker='o')
+        plt.plot(balls, self.team2.runs_per_ball, label=self.team2.name, marker='o')
+        plt.xlabel('Ball Number')
+        plt.ylabel('Runs Scored')
+        plt.title('Scorecard')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
     def display_scorecard_(self):
         print(f"Team: {self.name}")
         print(f"Score: {self.score}/{self.wickets} in {self.balls_faced} balls")
@@ -153,7 +184,7 @@ class CricketGame:
         for player in self.players:
             player.display_statistics()
     def start_game(self):
-        print(f"Starting the {self.match_format} match between {self.team1.name} and {self.team2.name}")
+        print(f"Starting the {self.match_format} match between {self.team1.name} and {self.team2.name} with {self.weather_conditions} conditions")
         print(f"{self.team1.name} is batting first")
         self.play_innings(self.team1)
         print(f"{self.team1.name} finished their innings with {self.team1.score} runs")
@@ -162,6 +193,7 @@ class CricketGame:
         print(f"{self.team2.name} finished their innings with {self.team2.score} runs")
         self.display_match_summary()
         self.display_overall_statistics()
+        self.plot_scorecard()
     def display_scorecard_(self):
         print(f"Team: {self.name}")
         print(f"Score: {self.score}/{self.wickets} in {self.balls_faced} balls")
@@ -191,7 +223,8 @@ def main():
     team2_players = select_team(team2_name)
     overs = int(input("Enter number of overs for the match: "))
     match_format = input("Enter match format (T20/ODI/Test): ").upper()
-    game = CricketGame(team1_name, team2_name, overs, team1_players, match_format)
+    weather_conditions = input("Enter weather conditions (Clear/Rainy/Windy): ").capitalize()
+    game = CricketGame(team1_name, team2_name, overs, team1_players, match_format, weather_conditions)
     game.start_game()
     while True:
         replay = input("Do you want to play another match? (yes/no): ").lower()
@@ -202,7 +235,8 @@ def main():
             team2_players = select_team(team2_name)
             overs = int(input("Enter number of overs for the match: "))
             match_format = input("Enter match format (T20/ODI/Test): ").upper()
-            game = CricketGame(team1_name, team2_name, overs, team1_players, match_format)
+            weather_conditions = input("Enter weather conditions (Clear/Rainy/Windy): ").capitalize()
+            game = CricketGame(team1_name, team2_name, overs, team1_players, match_format, weather_conditions)
             game.start_game()
         else:
             game.display_match_history()
