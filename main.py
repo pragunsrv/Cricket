@@ -19,10 +19,18 @@ class Player:
         self.fatigue = 0
         self.injury_status = False
         self.injury_history = []
-        self.skills = {"Batting": 50, "Bowling": 50, "Fielding": 50}
+        self.skills = {"Batting": 50, "Bowling": 50, "Fielding": 50, "Fitness": 50, "Strategy": 50}
         self.training_sessions = 0
-        self.practice_effectiveness = {"Batting": 0.1, "Bowling": 0.1, "Fielding": 0.1}
+        self.practice_effectiveness = {"Batting": 0.1, "Bowling": 0.1, "Fielding": 0.1, "Fitness": 0.1, "Strategy": 0.1}
         self.performance_history = {"Batting": [], "Bowling": []}
+        self.match_winning_impact = random.uniform(0.1, 0.5)
+        self.age = random.randint(20, 35)
+        self.experience = random.uniform(0.1, 1.0)
+        self.mental_strength = random.uniform(0.5, 1.0)
+        self.training_intensity = 0.1
+        self.recovery_time = 0
+        self.training_load = 0
+        self.injury_history = []
 
     def train(self, skill):
         if skill in self.skills:
@@ -30,6 +38,17 @@ class Player:
             self.skills[skill] += increase
             self.training_sessions += 1
             self.practice_effectiveness[skill] += 0.05
+            self.training_load += increase
+            if self.training_load > 100:
+                self.injury_status = True
+                self.injury_history.append("Training Injury")
+                self.recovery_time = random.randint(1, 3)
+
+    def recover(self):
+        if self.recovery_time > 0:
+            self.recovery_time -= 1
+            if self.recovery_time == 0:
+                self.injury_status = False
 
     def bat(self):
         if not self.is_out and not self.injury_status:
@@ -54,6 +73,7 @@ class Player:
             if random.random() < 0.05:
                 self.injury_status = True
                 self.injury_history.append("Injury")
+            self.recover()
             return runs, shot_type
         return 0, "N/A"
 
@@ -112,6 +132,8 @@ class Team:
         self.matches_won = 0
         self.shot_counts = {"Defensive": 0, "Aggressive": 0, "Neutral": 0}
         self.training_sessions = 0
+        self.strategy = {"Aggression": 50, "Defense": 50}
+        self.form_index = 0.0
 
     def get_current_batsman(self):
         return self.players[self.current_batsman_index]
@@ -174,34 +196,76 @@ class Team:
         print(f"Matches Won: {self.matches_won}")
         for player in self.players:
             player.display_statistics()
+    def get_currentt_batsman(self):
+        return self.players[self.current_batsman_index]
+
+    def get_currentt_bowler(self):
+        return self.players[self.current_bowler_index]
+
+    def train_all_playerrs(self, skill):
+        for player in self.players:
+            player.train(skill)
+        self.training_sessions += 1
+
+    def bat_(self):
+        if self.wickets < 10:
+            current_batsman = self.get_current_batsman()
+            runs, shot_type = current_batsman.bat()
+            self.score += runs
+            self.balls_faced += 1
+            self.runs_per_ball.append(runs)
+            self.shot_types.append(shot_type)
+            self.shot_counts[shot_type] += 1
+            if current_batsman.is_out:
+                current_batsman.update_statistics()
+                self.wickets += 1
+                self.current_batsman_index += 1
+            return runs, shot_type
+        return 0, "N/A"
+
+    def bowl_(self):
+        if self.balls_faced < self.total_balls:
+            current_bowler = self.get_current_bowler()
+            runs, ball_type, wickets = current_bowler.bowl()
+            self.runs_per_ball.append(runs)
+            if wickets > 0:
+                self.wickets += wickets
+                self.current_batsman_index += 1
+            return runs, ball_type, wickets
+        return 0, "N/A", 0
+    def adjust_strategy(self):
+        total_runs = sum(self.runs_per_ball)
+        if total_runs / self.balls_faced > 6:
+            self.strategy["Aggression"] += 10
+        else:
+            self.strategy["Defense"] += 10
+
+    def assess_performance(self):
+        self.form_index = (self.score / self.balls_faced) * 100
 
 class Tournament:
     def __init__(self, teams, format_type):
         self.teams = teams
         self.format_type = format_type
+        self.matches = []
         self.group_stage_results = []
         self.knockout_stage_results = []
-        self.tournament_phase = 1
-        self.phases = {
-            1: "Group Stage",
-            2: "Quarter Finals",
-            3: "Semi Finals",
-            4: "Finals"
-        }
-        self.matches = []
+        self.tournament_phase = 0
+        self.phases = {}
 
     def simulate_group_stage(self):
-        print("Simulating Group Stage...")
-        results = {}
-        for team in self.teams:
-            results[team.name] = random.randint(0, 10)
-        self.group_stage_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
-        print("Group Stage Results:")
-        for team, points in self.group_stage_results:
-            print(f"{team}: {points} points")
+        self.phases[1] = "Group Stage"
+        for i in range(len(self.teams)):
+            for j in range(i + 1, len(self.teams)):
+                team1 = self.teams[i]
+                team2 = self.teams[j]
+                self.play_match(team1.name, team2.name)
+                self.group_stage_results.append((team1.name, team1.score))
+                self.group_stage_results.append((team2.name, team2.score))
 
     def simulate_knockout_stage(self):
-        print(f"Simulating Knockout Stage - Phase {self.tournament_phase}: {self.phases[self.tournament_phase]}")
+        self.tournament_phase += 1
+        self.phases[self.tournament_phase] = "Knockout Stage"
         if self.format_type == "Single-Elimination":
             self.simulate_single_elimination()
         elif self.format_type == "Double-Elimination":
@@ -230,7 +294,7 @@ class Tournament:
 
     def simulate_double_elimination(self):
         print("Double Elimination is not yet implemented.")
-        
+
     def simulate_round_robin(self):
         print("Round-Robin is not yet implemented.")
 
@@ -341,6 +405,32 @@ def select_team(team_name):
         players.append(player_name)
     return players
 
+def play_match_(self, team1_name, team2_name):
+        team1 = next(team for team in self.teams if team.name == team1_name)
+        team2 = next(team for team in self.teams if team.name == team2_name)
+        overs = 20
+        match_format = "T20"
+        weather_conditions = "Clear"
+        stadium = "Neutral"
+        game = CricketGame(team1_name, team2_name, overs, team1.players, match_format, weather_conditions, stadium)
+        game.start_game()
+        return {
+            'team1': team1_name,
+            'team2': team2_name,
+            'winner': team1_name if team1.score > team2.score else team2_name
+        }
+
+def schedule_matches_(self):
+        print("Scheduling Matches...")
+        self.simulate_group_stage()
+
+def display_tourrnament_summary(self):
+        print("Tournament Summary:")
+        for phase in range(1, self.tournament_phase + 1):
+            print(f"Phase {phase}: {self.phases[phase]}")
+        print("Knockout Stage Results:")
+        for result in self.knockout_stage_results:
+            print(f"Winner: {result}")
 def simulate_single_elimination(self):
     if self.tournament_phase == 1:
         self.simulate_group_stage()
@@ -412,7 +502,7 @@ def main():
             team_name = input("Enter team name: ")
             players = select_team(team_name)
             teams.append(Team(team_name, players))
-        format_type = input("Enter tournament format (Single-Elimination/Double-Elimination/Round-Robin): ")
+        format_type = input("Enter tournament format (Single-Elimination/Double-Elimination/Round-Robin): ").capitalize()
         tournament = create_tournament(teams, format_type)
         tournament.schedule_matches()
         tournament.simulate_knockout_stage()
