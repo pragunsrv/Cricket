@@ -10,6 +10,7 @@ class Player:
         self.total_runs = 0
         self.total_balls_faced = 0
         self.high_score = 0
+        self.matches_won = 0
 
     def bat(self):
         if not self.is_out:
@@ -32,7 +33,7 @@ class Player:
         self.is_out = False
 
     def display_statistics(self):
-        print(f"{self.name}: Matches: {self.matches_played}, Total Runs: {self.total_runs}, Total Balls Faced: {self.total_balls_faced}, High Score: {self.high_score}")
+        print(f"{self.name}: Matches: {self.matches_played}, Total Runs: {self.total_runs}, Total Balls Faced: {self.total_balls_faced}, High Score: {self.high_score}, Matches Won: {self.matches_won}")
 
 class Team:
     def __init__(self, name, players):
@@ -66,6 +67,8 @@ class Team:
         if won:
             self.matches_won += 1
         for player in self.players:
+            if won:
+                player.matches_won += 1
             player.update_statistics()
 
     def display_scorecard(self):
@@ -88,6 +91,7 @@ class CricketGame:
         self.team2 = Team(team2_name, players_per_team)
         self.overs = overs
         self.total_balls = self.overs * 6
+        self.match_history = []
 
     def play_innings(self, batting_team):
         for _ in range(self.total_balls):
@@ -103,17 +107,38 @@ class CricketGame:
             print(f"{self.team1.name} wins by {self.team1.score - self.team2.score} runs")
             self.team1.update_team_statistics(True)
             self.team2.update_team_statistics(False)
+            self.match_history.append(f"{self.team1.name} won by {self.team1.score - self.team2.score} runs")
         elif self.team2.score > self.team1.score:
             print(f"{self.team2.name} wins by {self.team2.score - self.team1.score} runs")
             self.team2.update_team_statistics(True)
             self.team1.update_team_statistics(False)
+            self.match_history.append(f"{self.team2.name} won by {self.team2.score - self.team1.score} runs")
         else:
             print("The match is a tie")
+            self.match_history.append("The match was a tie")
 
     def display_overall_statistics(self):
         self.team1.display_team_statistics()
         self.team2.display_team_statistics()
 
+    def display_match_history(self):
+        print("Match History:")
+        for i, match in enumerate(self.match_history, 1):
+            print(f"Match {i}: {match}")
+
+    def display_scorecard_(self):
+        print(f"Team: {self.name}")
+        print(f"Score: {self.score}/{self.wickets} in {self.balls_faced} balls")
+        print(f"Runs per ball: {self.runs_per_ball}")
+        for player in self.players:
+            status = "Out" if player.is_out else "Not Out"
+            print(f"{player.name}: {player.runs} runs off {player.balls_faced} balls ({status})")
+
+    def display_team_statistics_(self):
+        print(f"Team: {self.name}")
+        print(f"Matches Won: {self.matches_won}")
+        for player in self.players:
+            player.display_statistics()
     def start_game(self):
         print(f"Starting the match between {self.team1.name} and {self.team2.name}")
         print(f"{self.team1.name} is batting first")
@@ -125,6 +150,29 @@ class CricketGame:
         self.display_match_summary()
         self.display_overall_statistics()
 
-players = ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6", "Player 7", "Player 8", "Player 9", "Player 10", "Player 11"]
-game = CricketGame("Team A", "Team B", 2, players)
-game.start_game()
+def select_team(team_name):
+        print(f"Select players for {team_name}:")
+        players = []
+        for i in range(1, 12):
+            player_name = input(f"Enter name for Player {i}: ")
+            players.append(player_name)
+        return players
+
+def main():
+        print("Welcome to the Cricket Game!")
+        team1_name = input("Enter name for Team 1: ")
+        team2_name = input("Enter name for Team 2: ")
+        team1_players = select_team(team1_name)
+        team2_players = select_team(team2_name)
+        overs = int(input("Enter number of overs for the match: "))
+        game = CricketGame(team1_name, team2_name, overs, team1_players)
+        game.start_game()
+        while True:
+            replay = input("Do you want to play another match? (yes/no): ").lower()
+            if replay == "yes":
+                game.start_game()
+            else:
+                game.display_match_history()
+                break
+
+main()
