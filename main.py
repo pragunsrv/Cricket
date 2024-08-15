@@ -19,16 +19,27 @@ class Player:
         self.fatigue = 0
         self.injury_status = False
         self.injury_history = []
+        self.skills = {"Batting": 50, "Bowling": 50, "Fielding": 50}
+        self.training_sessions = 0
+        self.practice_effectiveness = {"Batting": 0.1, "Bowling": 0.1, "Fielding": 0.1}
+
+    def train(self, skill):
+        if skill in self.skills:
+            increase = random.uniform(0.1, 0.5)
+            self.skills[skill] += increase
+            self.training_sessions += 1
+            self.practice_effectiveness[skill] += 0.05
 
     def bat(self):
         if not self.is_out and not self.injury_status:
+            skill_multiplier = self.skills["Batting"] / 100
             shot_type = random.choices(["Defensive", "Aggressive", "Neutral"], [0.3, 0.5, 0.2])[0]
             if shot_type == "Defensive":
-                runs = random.randint(0, 2)
+                runs = int(random.uniform(0, 2) * skill_multiplier)
             elif shot_type == "Aggressive":
-                runs = random.randint(0, 6)
+                runs = int(random.uniform(0, 6) * skill_multiplier)
             else:
-                runs = random.randint(0, 4)
+                runs = int(random.uniform(0, 4) * skill_multiplier)
             self.runs += runs
             self.balls_faced += 1
             if runs == 0 and random.choice([True, False]):
@@ -57,11 +68,15 @@ class Player:
         self.injury_status = False
         self.fatigue = max(0, self.fatigue - 10)
         self.form = min(100, self.form)
+        for skill in self.skills:
+            self.skills[skill] = min(100, self.skills[skill] + self.practice_effectiveness[skill])
 
     def display_statistics(self):
         print(f"{self.name}: Matches: {self.matches_played}, Total Runs: {self.total_runs}, Total Balls Faced: {self.total_balls_faced}, High Score: {self.high_score}, Matches Won: {self.matches_won}, Form: {self.form:.2f}, Fatigue: {self.fatigue:.2f}, Injury Status: {'Injured' if self.injury_status else 'Healthy'}")
         if self.injury_history:
             print(f"Injury History: {', '.join(self.injury_history)}")
+        print(f"Skills: {self.skills}")
+        print(f"Training Sessions: {self.training_sessions}")
 
 class Team:
     def __init__(self, name, players):
@@ -75,9 +90,15 @@ class Team:
         self.shot_types = []
         self.matches_won = 0
         self.shot_counts = {"Defensive": 0, "Aggressive": 0, "Neutral": 0}
+        self.training_sessions = 0
 
     def get_current_batsman(self):
         return self.players[self.current_batsman_index]
+
+    def train_all_players(self, skill):
+        for player in self.players:
+            player.train(skill)
+        self.training_sessions += 1
 
     def bat(self):
         if self.wickets < 10:
@@ -132,6 +153,7 @@ class Tournament:
             3: "Semi Finals",
             4: "Finals"
         }
+        self.matches = []
 
     def simulate_group_stage(self):
         print("Simulating Group Stage...")
@@ -183,34 +205,28 @@ class Tournament:
             self.teams = match_results
         print(f"Tournament Winner: {self.teams[0].name}")
 
+    def schedule_matches(self):
+        num_teams = len(self.teams)
+        self.matches = [(self.teams[i], self.teams[j]) for i in range(num_teams) for j in range(i + 1, num_teams)]
+
     def display_tournament_summary(self):
-        print(f"Tournament Format: {self.format_type}")
-        print(f"Phase: {self.phases[self.tournament_phase - 1]}")
-        print("Group Stage Results:")
-        for team, points in self.group_stage_results:
-            print(f"{team}: {points} points")
-        print("Knockout Stage Results:")
-        for result in self.knockout_stage_results:
-            print(result)
+        print("Tournament Summary:")
+        for phase in range(1, self.tournament_phase):
+            print(f"Phase {phase}: {self.phases[phase]}")
 
 class CricketGame:
-    def __init__(self, team1_name, team2_name, overs, players_per_team, match_format, weather_conditions, stadium):
-        self.team1 = Team(team1_name, players_per_team)
-        self.team2 = Team(team2_name, players_per_team)
+    def __init__(self, team1_name, team2_name, overs, team1_players, match_format, weather_conditions, stadium):
+        self.team1 = Team(team1_name, team1_players)
+        self.team2 = Team(team2_name, team2_players)
         self.overs = overs
-        self.total_balls = self.overs * 6
         self.match_format = match_format
         self.weather_conditions = weather_conditions
         self.stadium = stadium
+        self.total_balls = overs * 6
         self.match_history = []
-        self.weather_effects = {
-            "Clear": 1.0,
-            "Rainy": 0.7,
-            "Windy": 0.8
-        }
 
     def apply_weather_conditions(self, team):
-        effect = self.weather_effects.get(self.weather_conditions, 1.0)
+        effect = {"Clear": 1.0, "Rainy": 0.8, "Windy": 0.9}.get(self.weather_conditions, 1.0)
         for player in team.players:
             if not player.injury_status:
                 player.form *= effect
@@ -245,7 +261,53 @@ class CricketGame:
 
     def plot_scorecard(self):
         balls = np.arange(1, len(self.team1.runs_per_ball) + 1)
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(12, 8))
+        plt.plot(balls, self.team1.runs_per_ball, label=self.team1.name, marker='o')
+        plt.plot(balls, self.team2.runs_per_ball, label=self.team2.name, marker='o')
+        plt.xlabel('Ball Number')
+        plt.ylabel('Runs Scored')
+        plt.title(f'Scorecard for {self.stadium}')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def apply_weather_conditions(self, team):
+        effect = {"Clear": 1.0, "Rainy": 0.8, "Windy": 0.9}.get(self.weather_conditions, 1.0)
+        for player in team.players:
+            if not player.injury_status:
+                player.form *= effect
+                player.fatigue *= effect
+
+    def play_innings(self, team):
+        self.apply_weather_conditions(team)
+        for _ in range(self.total_balls):
+            runs, shot_type = team.bat()
+            if team.get_current_batsman().is_out:
+                break
+
+    def display_match_summary(self):
+        print(f"Match Summary at {self.stadium}:")
+        if self.team1.score > self.team2.score:
+            print(f"{self.team1.name} wins by {self.team1.score - self.team2.score} runs")
+            self.team1.update_team_statistics(True)
+            self.team2.update_team_statistics(False)
+            self.match_history.append(f"{self.team1.name} won by {self.team1.score - self.team2.score} runs")
+        elif self.team2.score > self.team1.score:
+            print(f"{self.team2.name} wins by {self.team2.score - self.team1.score} runs")
+            self.team2.update_team_statistics(True)
+            self.team1.update_team_statistics(False)
+            self.match_history.append(f"{self.team2.name} won by {self.team2.score - self.team1.score} runs")
+        else:
+            print("The match is a tie")
+            self.match_history.append("The match was a tie")
+
+    def display_overall_statistics(self):
+        self.team1.display_team_statistics()
+        self.team2.display_team_statistics()
+
+    def plot_scorecard(self):
+        balls = np.arange(1, len(self.team1.runs_per_ball) + 1)
+        plt.figure(figsize=(12, 8))
         plt.plot(balls, self.team1.runs_per_ball, label=self.team1.name, marker='o')
         plt.plot(balls, self.team2.runs_per_ball, label=self.team2.name, marker='o')
         plt.xlabel('Ball Number')
@@ -316,6 +378,7 @@ def main():
             teams.append(Team(team_name, players))
         format_type = input("Enter tournament format (Single-Elimination/Double-Elimination): ")
         tournament = create_tournament(teams, format_type)
+        tournament.schedule_matches()
         tournament.simulate_knockout_stage()
         tournament.display_tournament_summary()
 
