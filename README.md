@@ -1,6 +1,3 @@
-Here's a `README.md` file for your Cricket game project:
-
-```markdown
 # Cricket Game Simulation
 
 ## Overview
